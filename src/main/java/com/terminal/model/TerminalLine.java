@@ -4,8 +4,8 @@ package com.terminal.model;
  * @author tankaiwen
  */
 public class TerminalLine {
-    private final Cell[] cells;
-    private final int width;
+    private Cell[] cells;
+    private int width;
 
     public TerminalLine(int width) {
         if (width <= 0) {
@@ -13,7 +13,6 @@ public class TerminalLine {
         }
         this.width = width;
         this.cells = new Cell[width];
-
         for (int i = 0; i < width; i++) {
             this.cells[i] = new Cell();
         }
@@ -59,5 +58,22 @@ public class TerminalLine {
             sb.append(cell.getContent());
         }
         return sb.toString();
+    }
+
+    public void resizeWidth(int newWidth) {
+        if (newWidth == this.width) {
+            return;
+        }
+
+        Cell[] newCells = new Cell[newWidth];
+        for (int i = 0; i < newWidth; i++) {
+            if (i < this.width) {
+                newCells[i] = this.cells[i];
+            } else {
+                newCells[i] = new Cell();
+            }
+        }
+        this.cells = newCells;
+        this.width = newWidth;
     }
 }

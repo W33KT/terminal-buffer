@@ -89,4 +89,40 @@ class TerminalBufferTest {
         assertEquals(" ", buffer.getCharAt(0, 0));
         assertThrows(IndexOutOfBoundsException.class, () -> buffer.getLineAsString(-1));
     }
+
+    @Test
+    @DisplayName("Bonus: In the wide character test, Chinese characters should occupy two spaces and wrap correctly at the end of the line.")
+    void testWideCharacters() {
+        // 测试中文字符占据两格
+        buffer.write("中");
+        assertEquals(2, buffer.getCursorX());
+        assertEquals("中", buffer.getCharAt(0, 0));
+        assertEquals("", buffer.getCharAt(1, 0));
+
+        buffer.setCursorPosition(8, 2);
+        buffer.write("A");
+
+        buffer.write("文");
+
+        assertEquals(" ", buffer.getCharAt(9, 1));
+        assertEquals("文", buffer.getCharAt(0, 2));
+        assertEquals(2, buffer.getCursorX());
+    }
+
+    @Test
+    @DisplayName("Bonus: Screen resizing test; when reducing the height, it should be correctly saved to the rollback area.")
+    void testResizeShrinkHeight() {
+        buffer.write("Line1");
+        buffer.setCursorPosition(0, 1);
+        buffer.write("Line2");
+        buffer.setCursorPosition(0, 2);
+        buffer.write("Line3");
+
+        buffer.resize(10, 2);
+
+        assertEquals(2, buffer.getHeight());
+        assertTrue(buffer.getLineAsString(0).startsWith("Line2"));
+        assertTrue(buffer.getLineAsString(1).startsWith("Line3"));
+        assertTrue(buffer.getLineAsString(-1).startsWith("Line1")); // 回滚区数据
+    }
 }

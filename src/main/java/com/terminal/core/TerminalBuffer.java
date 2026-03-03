@@ -12,8 +12,8 @@ import java.util.List;
  * @author tankaiwen
  */
 public class TerminalBuffer {
-    private final int width;
-    private final int height;
+    private int width;
+    private int height;
     private final int maxScrollback;
 
     private final List<TerminalLine> screen;
@@ -107,32 +107,10 @@ public class TerminalBuffer {
         screen.add(new TerminalLine(width));
     }
 
-    public void write(String text) {
-        for (int i = 0; i < text.length(); i++) {
-            String ch = String.valueOf(text.charAt(i));
-
-            if (cursorX >= width) {
-                cursorX = 0;
-                if (cursorY == height - 1) {
-                    insertEmptyLineAtBottom();
-                } else {
-                    cursorY++;
-                }
-            }
-
-            getCurrentLine().getCell(cursorX).set(ch, currentAttributes, false);
-            cursorX++;
-        }
-    }
-
     public void insert(String text) {
         int len = text.length();
         getCurrentLine().shiftRight(cursorX, len);
         write(text);
-    }
-
-    public void fillLine(String content) {
-        getCurrentLine().fill(content, currentAttributes);
     }
 
     public void clearScreen() {
@@ -172,20 +150,83 @@ public class TerminalBuffer {
         return getTargetLine(row).getText();
     }
 
-    public String getScreenContent() {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < height; i++) {
-            sb.append(screen.get(i).getText()).append(System.lineSeparator());
+    public void resize(int newWidth, int newHeight) {
+        if (newWidth <= 0 || newHeight <= 0) {
+            return;
         }
-        return sb.toString();
+
+        if (newHeight < this.height) {
+            int linesToRemove = this.height - newHeight;
+            for (int i = 0; i < linesToRemove; i++) {
+                TerminalLine top = screen.remove(0);
+                if (maxScrollback > 0) {
+                    if (scrollback.size() >= maxScrollback) {
+                        scrollback.pollFirst();
+                    }
+                    scrollback.addLast(top);
+                }
+            }
+        } else if (newHeight > this.height) {
+            int linesToAdd = newHeight - this.height;
+            for (int i = 0; i < linesToAdd; i++) {
+                screen.add(new TerminalLine(this.width));
+            }
+        }
+        this.height = newHeight;
+
+        if (newWidth != this.width) {
+            for (TerminalLine line : screen) {
+                line.resizeWidth(newWidth);
+            }
+            for (TerminalLine line : scrollback) {
+                line.resizeWidth(newWidth);
+            }
+            this.width = newWidth;
+        }
+
+        this.cursorX = Math.min(this.cursorX, this.width - 1);
+        this.cursorY = Math.min(this.cursorY, this.height - 1);
     }
 
-    public String getEntireContent() {
-        StringBuilder sb = new StringBuilder();
-        for (TerminalLine line : scrollback) {
-            sb.append(line.getText()).append(System.lineSeparator());
+    private boolean isWideChar(int codePoint) {
+        return Character.UnicodeScript.of(codePoint) == Character.UnicodeScript.HAN ||
+                Character.UnicodeScript.of(codePoint) == Character.UnicodeScript.HIRAGANA ||
+                Character.UnicodeScript.of(codePoint) == Character.UnicodeScript.KATAKANA ||
+                Character.UnicodeScript.of(codePoint) == Character.UnicodeScript.HANGUL ||
+                (codePoint >= 0x1F300 && codePoint <= 0x1F9FF);
+    }
+
+    public void write(String text) {
+        for (int i = 0; i < text.length(); ) {
+            int codePoint = text.codePointAt(i);
+            int charCount = Character.charCount(codePoint);
+            String ch = text.substring(i, i + charCount);
+            i += charCount;
+
+            boolean isWide = isWideChar(codePoint);
+
+            if (cursorX >= width || (isWide && cursorX == width - 1)) {
+                if (cursorX == width - 1) {
+                    getCurrentLine().getCell(cursorX).reset();
+                }
+
+                cursorX = 0;
+                if (cursorY == height - 1) {
+                    insertEmptyLineAtBottom();
+                } else {
+                    cursorY++;
+                }
+            }
+
+            getCurrentLine().getCell(cursorX).set(ch, currentAttributes, isWide);
+            cursorX++;
+
+            if (isWide) {
+                if (cursorX < width) {
+                    getCurrentLine().getCell(cursorX).set("", currentAttributes, false);
+                    cursorX++;
+                }
+            }
         }
-        sb.append(getScreenContent());
-        return sb.toString();
     }
 }
