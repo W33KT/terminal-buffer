@@ -60,19 +60,31 @@ public class TerminalBuffer {
     }
 
     public void moveCursorUp(int n) {
-        if (n > 0) setCursorPosition(cursorX, cursorY - n);
+        if (n <= 0) {
+            return;
+        }
+        setCursorPosition(cursorX, cursorY - n);
     }
 
     public void moveCursorDown(int n) {
-        if (n > 0) setCursorPosition(cursorX, cursorY + n);
+        if (n <= 0) {
+            return;
+        }
+        setCursorPosition(cursorX, cursorY + n);
     }
 
     public void moveCursorLeft(int n) {
-        if (n > 0) setCursorPosition(cursorX - n, cursorY);
+        if (n <= 0) {
+            return;
+        }
+        setCursorPosition(cursorX - n, cursorY);
     }
 
     public void moveCursorRight(int n) {
-        if (n > 0) setCursorPosition(cursorX + n, cursorY);
+        if (n <= 0) {
+            return;
+        }
+        setCursorPosition(cursorX + n, cursorY);
     }
 
     protected TerminalLine getCurrentLine() {
@@ -81,4 +93,99 @@ public class TerminalBuffer {
 
     public int getWidth() { return width; }
     public int getHeight() { return height; }
+
+    public void insertEmptyLineAtBottom() {
+        TerminalLine topApples = screen.remove(0);
+
+        if (maxScrollback > 0) {
+            if (scrollback.size() >= maxScrollback) {
+                scrollback.pollFirst();
+            }
+            scrollback.addLast(topApples);
+        }
+
+        screen.add(new TerminalLine(width));
+    }
+
+    public void write(String text) {
+        for (int i = 0; i < text.length(); i++) {
+            String ch = String.valueOf(text.charAt(i));
+
+            if (cursorX >= width) {
+                cursorX = 0;
+                if (cursorY == height - 1) {
+                    insertEmptyLineAtBottom();
+                } else {
+                    cursorY++;
+                }
+            }
+
+            getCurrentLine().getCell(cursorX).set(ch, currentAttributes, false);
+            cursorX++;
+        }
+    }
+
+    public void insert(String text) {
+        int len = text.length();
+        getCurrentLine().shiftRight(cursorX, len);
+        write(text);
+    }
+
+    public void fillLine(String content) {
+        getCurrentLine().fill(content, currentAttributes);
+    }
+
+    public void clearScreen() {
+        for (TerminalLine line : screen) {
+            line.fill(" ", Attributes.DEFAULT);
+        }
+    }
+
+    public void clearAll() {
+        clearScreen();
+        scrollback.clear();
+    }
+
+    private TerminalLine getTargetLine(int row) {
+        if (row >= 0 && row < height) {
+            return screen.get(row);
+        } else if (row < 0 && row >= -scrollback.size()) {
+            java.util.Iterator<TerminalLine> it = scrollback.descendingIterator();
+            TerminalLine target = null;
+            for (int i = 0; i < Math.abs(row); i++) {
+                target = it.next();
+            }
+            return target;
+        }
+        throw new IndexOutOfBoundsException("Row index out of bounds: " + row);
+    }
+
+    public String getCharAt(int col, int row) {
+        return getTargetLine(row).getCell(col).getContent();
+    }
+
+    public Attributes getAttributesAt(int col, int row) {
+        return getTargetLine(row).getCell(col).getAttributes();
+    }
+
+    public String getLineAsString(int row) {
+        return getTargetLine(row).getText();
+    }
+
+    public String getScreenContent() {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < height; i++) {
+            sb.append(screen.get(i).getText()).append(System.lineSeparator());
+        }
+        return sb.toString();
+    }
+
+    public String getEntireContent() {
+        StringBuilder sb = new StringBuilder();
+        for (TerminalLine line : scrollback) {
+            sb.append(line.getText()).append(System.lineSeparator());
+        }
+        sb.append(getScreenContent());
+        return sb.toString();
+    }
 }

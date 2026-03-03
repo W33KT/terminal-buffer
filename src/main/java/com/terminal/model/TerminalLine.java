@@ -1,5 +1,8 @@
 package com.terminal.model;
 
+/**
+ * @author tankaiwen
+ */
 public class TerminalLine {
     private final Cell[] cells;
     private final int width;
